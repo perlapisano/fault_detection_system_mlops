@@ -1,0 +1,93 @@
+services:
+
+  # ── Redpanda (Kafka-compatible broker) ───────────────────
+  redpanda:
+    image: redpandadata/redpanda:latest
+    container_name: redpanda
+    command:
+      - redpanda start
+      - --smp 1
+      - --overprovisioned
+      - --node-id 0
+      - --kafka-addr PLAINTEXT://0.0.0.0:29092,OUTSIDE://0.0.0.0:19092
+      - --advertise-kafka-addr PLAINTEXT://redpanda:29092,OUTSIDE://localhost:19092
+      - --pandaproxy-addr 0.0.0.0:8082
+      - --advertise-pandaproxy-addr localhost:8082
+    ports:
+      - "19092:19092"
+      - "8082:8082"
+      - "9644:9644"
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "info"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redpanda Console (UI browser) ────────────────────────
+  redpanda-console:
+    image: redpandadata/console:latest
+    container_name: redpanda-console
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_BROKERS: redpanda:29092
+    depends_on:
+      redpanda:
+        condition: service_healthy
+
+  
+  # ── Topic Init ───────────────────────────────────────────
+  # topic-init:
+  #   image: redpandadata/redpanda:latest
+  #   container_name: topic-init
+  #   depends_on:
+  #     redpanda:
+  #       condition: service_healthy
+  #   entrypoint: ["/bin/bash", "-c"]
+  #   command:
+  #     - |
+  #       rpk topic create feature-simulator --brokers redpanda:29092 --partitions 3
+  #       rpk topic create feature-alerts --brokers redpanda:29092
+  #       echo "Topics creati con successo"
+  #   restart: "no"
+
+  # ── Transaction Simulator ─────────────────────────────────
+  simulator:
+    build:
+      context: .
+    container_name: tx-simulator
+    command: sh -c "uv run simulator.py"
+    volumes:
+      - ./state:/app/state
+    environment:
+      KAFKA_BROKER: redpanda:29092
+      TOPIC_NAME: feature-simulator
+      RILEVAZIONI_AL_S: "5"
+    env_file:
+      - .env
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      # topic-init:
+      #   condition: service_completed_successfully
+    restart: on-failure
+
+# ── Alerts Server ─────────────────────────────────
+  alerts-server:
+    build:
+      context: .
+    container_name: alerts-server
+    command: sh -c "uv run alerts-server.py"
+    volumes:
+      - ./state:/app/state
+    environment:
+      KAFKA_BROKER: redpanda:29092
+      TOPIC_NAME: feature-simulator
+    env_file:
+      - .env
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      # topic-init:
+      #   condition: service_completed_successfully
+    restart: on-failure
