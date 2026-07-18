@@ -51,8 +51,8 @@ services:
   #       echo "Topics creati con successo"
   #   restart: "no"
 
-  # ── Transaction Simulator ─────────────────────────────────
-  simulator:
+  # ── Batch Processing Pipeline
+  batch_processing:
     build:
       context: ./batch_processing
       additional_contexts:
