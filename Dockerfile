@@ -1,13 +1,17 @@
 # Tratto dal file esempio di Astral
 # https://github.com/astral-sh/uv-docker-example/blob/main/Dockerfile
 
-
 # Use a Python image with uv pre-installed
 FROM ghcr.io/astral-sh/uv:python3.12-trixie-slim
 
+# Nome del modulo
+ARG MODULE
+# Nome del gruppo di dipendenze uv
+ARG UV_GROUP
+
 # Setup a non-root user
-#RUN groupadd --system --gid 999 nonroot \
-#  && useradd --system --gid 999 --uid 999 --create-home nonroot
+# RUN groupadd --system --gid 999 nonroot \
+#   && useradd --system --gid 999 --uid 999 --create-home nonroot
 
 # Install the project into `/app`
 WORKDIR /app
@@ -35,13 +39,13 @@ ENV UV_TOOL_BIN_DIR=/usr/local/bin
 #  uv sync --locked --no-install-project
 
 COPY pyproject.toml uv.lock /app/
-RUN uv sync --locked --no-install-project
+RUN uv sync --group $UV_GROUP --locked --no-install-project
 
 # Then, add the rest of the project source code and install it
 # Installing separately from its dependencies allows optimal layer caching
-COPY .env alerts-server.py simulator.py /app/
+COPY .env feature_generator.py ./$MODULE/$MODULE.py /app/
 RUN --mount=type=cache,target=/root/.cache/uv \
-  uv sync --locked
+  uv sync --group $UV_GROUP --locked
 
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
