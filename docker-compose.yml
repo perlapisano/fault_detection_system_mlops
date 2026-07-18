@@ -54,9 +54,18 @@ services:
   # ── Transaction Simulator ─────────────────────────────────
   simulator:
     build:
-      context: .
-    container_name: tx-simulator
-    command: sh -c "uv run simulator.py"
+      context: ./batch_processing
+      additional_contexts:
+        parent: ./
+    container_name: batch_processing
+    environment:
+      DATA_DIR: /app/data
+      OUTPUT_DIR: /app/data/features
+    volumes:
+      - ./data:/app/data
+    profiles:
+      - batch
+
   # ── Feature Ingestion ─────────────────────────────────
   ingestion:
     build:
