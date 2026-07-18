@@ -8,3 +8,18 @@ dependencies = [
   "quixstreams",
   "loguru",
 ]
+[dependency-groups]
+ingestion = [
+  "quixstreams",
+  "loguru"
+]
+training = [
+  "loguru",
+  "pandas==2.2.0",
+  "numpy==1.26.4",
+  "pyarrow==14.0.0",
+  "scikit-learn==1.4.0",
+  "xgboost==2.0.3",
+  "matplotlib==3.8.2",
+  "mlflow-skinny==2.17",
+]
