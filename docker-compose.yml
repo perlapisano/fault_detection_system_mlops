@@ -57,12 +57,20 @@ services:
       context: .
     container_name: tx-simulator
     command: sh -c "uv run simulator.py"
+  # ── Feature Ingestion ─────────────────────────────────
+  ingestion:
+    build:
+      args:
+        MODULE: ingestion
+        UV_GROUP: ingestion
+    container_name: ingestion
+    command: sh -c "uv run ingestion.py"
     volumes:
       - ./state:/app/state
     environment:
       KAFKA_BROKER: redpanda:29092
       TOPIC_NAME: feature-simulator
-      RILEVAZIONI_AL_S: "5"
+      RILEVAZIONI_AL_S: 1
     env_file:
       - .env
     depends_on:

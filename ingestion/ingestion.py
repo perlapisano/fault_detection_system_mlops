@@ -20,36 +20,19 @@ from quixstreams import Application
 from quixstreams.sources import Source
 from loguru import logger
 
+from feature_generator import MachineDataGenerator, create_factory_fleet
+
 
 # ── Configurazione ────────────────────────────────────────
 KAFKA_BROKER = os.getenv("KAFKA_BROKER", "localhost:19092")
 TOPIC_NAME = os.getenv("TOPIC_NAME", "feature-simulator")
 
-TPS = float(os.getenv("RILEVAZIONI_AL_S", "5"))
-
-COUNTRIES = ["IT", "US", "CH", "RO", "FR", "GE", "SP"]
-
-COUNTRIES_NUM = len(COUNTRIES)
-
-CARDINAL_DIRECTION = ["N", "S", "E", "W"]
-STATION_IDS = list(range(1, 201))
-
-ID_TO_COUNTRY = {i: COUNTRIES[i % COUNTRIES_NUM] for i in STATION_IDS}
-
-# Velocità del vento
-NORMAL_AMOUNT_MIN = 0.0
-NORMAL_AMOUNT_MAX = 300.0
-WIND_SPEED_MEAN = 5.0
-WIND_SPEED_SD = 2.5
-
-# TODO: paesi diversi possono essere più o meno ventosi
-# NORMAL_COUNTRY_WEIGHTS = [0.60, 0.20, 0.12, 0.08]
-# NORMAL_MERCHANT_WEIGHTS = [0.40, 0.30, 0.20, 0.10]
+TPS = float(os.getenv("RILEVAZIONI_AL_S", "1"))
 
 
 class DataSimulatorSource(Source):
     """
-    Source personalizzata: genera rilevazioni della velocità e direzione del vento sintetiche a ritmo costante.
+    Source personalizzata: genera rilevazioni dei sensori a ritmo costante.
 
     Il metodo run() è il cuore della Source: gira finché l'app è attiva.
     Per ogni iterazione:
@@ -58,60 +41,42 @@ class DataSimulatorSource(Source):
       3. La pubblica su Kafka con self.produce()
     """
 
-    def __init__(self, tps: float = 5.0):
-        super().__init__(name="tx-simulator")
+    def __init__(self, tps: float = 1.0):
+        super().__init__(name="feature-simulator")
         self.tps = tps
         self.sleep_time = 1.0 / tps
+
+        self.factory_fleet = create_factory_fleet(12)
 
     def run(self):
         logger.info(f"Simulatore avviato — {self.tps} rilevazioni/secondo")
         count = 0
 
         while self.running:
-            data = self._generate_data()
+            for machine in self.factory_fleet:
+                # serialize() prepara key+value per Kafka
 
-            # serialize() prepara key+value per Kafka
-            msg = self.serialize(
-                key=str(data["station_id"]),
-                value=data,
-            )
-            self.produce(value=msg.value, key=msg.key)
+                data = machine.step()
+
+                data["timestamp_ms"] = int(datetime.now(timezone.utc).timestamp() * 1000)
+
+                msg = self.serialize(
+                    key=str(data["machine_id"]),
+                    value=data,
+                )
+                self.produce(value=msg.value, key=msg.key)
 
             count += 1
-            if count % 50 == 0:
+            if count % 10 == 0:
                 logger.info(f"Prodotte {count} rilevazioni")
 
             time.sleep(self.sleep_time)
 
-    def _generate_data(self) -> dict:
-        """
-        Genera un singolo dato.
-        """
-
-        station_id = random.choice(STATION_IDS)
-
-        wind_speed = max(
-            NORMAL_AMOUNT_MIN,
-            round(random.normalvariate(WIND_SPEED_MEAN, WIND_SPEED_SD), 2),
-        )
-
-        cardinal_direction = random.choice(CARDINAL_DIRECTION)
-
-        return {
-            "measurement_id": str(uuid.uuid4()),
-            "station_id": station_id,
-            "wind_speed": wind_speed,
-            "cardinal_direction": cardinal_direction,
-            "country": ID_TO_COUNTRY[station_id],
-            "timestamp_ms": int(datetime.now(timezone.utc).timestamp() * 1000),
-        }
-
-
-# ── Entry point ───────────────────────────────────────────
+# --- Entry point
 def main():
     app = Application(
         broker_address=KAFKA_BROKER,
-        consumer_group="tx-simulator-group",
+        consumer_group="feature-simulator-group",
     )
 
     topic = app.topic(TOPIC_NAME, value_serializer="json")
@@ -119,7 +84,7 @@ def main():
     source = DataSimulatorSource(tps=TPS)
 
     # topic passato subito qui: la Source scrive direttamente su feature-simulator,
-    # invece che sul suo topic interno di default (source__tx-simulator)
+    # invece che sul suo topic interno di default
     sdf = app.dataframe(topic=topic, source=source)
 
     logger.info(f"Connesso a {KAFKA_BROKER}, topic → {TOPIC_NAME}")
