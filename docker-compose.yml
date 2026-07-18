@@ -51,7 +51,23 @@ services:
   #       echo "Topics creati con successo"
   #   restart: "no"
 
-  # ── Batch Processing Pipeline
+  # ── Redis ───────────────
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    profiles:
+      - stream
+      - materialize
+      - infer
+
+  # ── Batch Data Processing
   batch_processing:
     build:
       context: ./batch_processing
@@ -88,6 +104,25 @@ services:
       # topic-init:
       #   condition: service_completed_successfully
     restart: on-failure
+
+# -- Batch Pipeline
+  batch_materialize:
+    build:
+      context: batch_materialize
+      dockerfile: Dockerfile
+    container_name: batch_materialize
+    environment:
+      DATA_DIR: /app/data
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      redis:
+        condition: service_healthy
+    profiles:
+      - materialize
+
 
 # ── Alerts Server ─────────────────────────────────
   alerts-server:
