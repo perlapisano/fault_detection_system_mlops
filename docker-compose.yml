@@ -123,23 +123,91 @@ services:
     profiles:
       - materialize
 
-
-# ── Alerts Server ─────────────────────────────────
-  alerts-server:
+  # ── Training Pipeline
+  training-pipeline:
     build:
-      context: .
-    container_name: alerts-server
-    command: sh -c "uv run alerts-server.py"
+      args:
+        MODULE: training
+        UV_GROUP: training
+    command: sh -c "uv run training.py"
+    container_name: training-pipeline
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
     volumes:
-      - ./state:/app/state
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./training:/app/training
+    depends_on:
+      mlflow:
+        condition: service_started
+    profiles:
+      - train
+
+  # -- MLflow
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.17.2
+    container_name: mlflow
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./mlflow:/mlflow
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --artifacts-destination /mlflow/artifacts
+      --serve-artifacts
+
+  # -- Streaming Feature Pipeline
+  streaming-pipeline:
+    build:
+      args:
+        MODULE: streaming
+        UV_GROUP: streaming
+    command: sh -c "uv run streaming.py"
+    container_name: streaming-pipeline
     environment:
       KAFKA_BROKER: redpanda:29092
-      TOPIC_NAME: feature-simulator
-    env_file:
-      - .env
+      INPUT_TOPIC: raw-transactions
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
     depends_on:
       redpanda:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       # topic-init:
       #   condition: service_completed_successfully
     restart: on-failure
+    profiles:
+      - stream
+
+  # -- Inference Pipeline
+  inference-pipeline:
+    build:
+      args:
+        MODULE: inference
+        UV_GROUP: inference
+    container_name: inference-pipeline
+    command: sh -c "uv run inference.py"
+    environment:
+      KAFKA_BROKER: redpanda:29092
+      INPUT_TOPIC: raw-transactions
+      OUTPUT_TOPIC: fraud-predictions
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MODEL_STAGE: Production
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      # topic-init:
+      #   condition: service_completed_successfully
+      mlflow:
+        condition: service_started
+    restart: on-failure
+    profiles:
+      - infer

@@ -14,5 +14,5 @@ from pyspark.sql.types import (
 from loguru import logger
 
 while True:
-    print(sys.version, __file__, os.getcwd())
+    print(sys.version, __file__)
     sleep(10)
