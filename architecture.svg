@@ -1,0 +1,100 @@
+<svg viewBox="0 0 1200 820" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4a4a4a"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1200" height="820" fill="#ffffff"/>
+
+  <text x="600" y="26" text-anchor="middle" font-size="18" font-weight="700" fill="#1a1a1a">Fault Detection System — Architecture</text>
+
+  <!-- Legend -->
+  <g font-size="11" fill="#333">
+    <rect x="60" y="780" width="14" height="14" fill="#E8833A"/>
+    <text x="80" y="791">Batch pipeline</text>
+    <rect x="200" y="780" width="14" height="14" fill="#1C7293"/>
+    <text x="220" y="791">Streaming pipeline</text>
+    <rect x="360" y="780" width="14" height="14" fill="#1C4E80"/>
+    <text x="380" y="791">Training pipeline</text>
+    <rect x="510" y="780" width="14" height="14" fill="#2C5F2D"/>
+    <text x="530" y="791">Inference</text>
+  </g>
+
+  <!-- Generator -->
+  <rect x="470" y="40" width="260" height="60" rx="10" fill="#33415C"/>
+  <text x="600" y="65" text-anchor="middle" font-size="13" font-weight="600" fill="#fff">Synthetic Data Generator</text>
+  <text x="600" y="83" text-anchor="middle" font-size="11" fill="#cfd6e4">shared generation logic</text>
+
+  <!-- Branch labels -->
+  <text x="330" y="130" text-anchor="middle" font-size="11" fill="#666" font-style="italic">batch</text>
+  <text x="880" y="130" text-anchor="middle" font-size="11" fill="#666" font-style="italic">streaming</text>
+
+  <!-- Left column: batch -->
+  <rect x="60" y="150" width="320" height="60" rx="8" fill="#E8833A"/>
+  <text x="220" y="185" text-anchor="middle" font-size="13" font-weight="600" fill="#fff">Historical Dataset (Parquet)</text>
+
+  <rect x="60" y="260" width="320" height="60" rx="8" fill="#E8833A"/>
+  <text x="220" y="286" text-anchor="middle" font-size="13" font-weight="600" fill="#fff">PySpark Batch</text>
+  <text x="220" y="303" text-anchor="middle" font-size="13" font-weight="600" fill="#fff">Feature Engineering</text>
+
+  <rect x="60" y="380" width="320" height="60" rx="8" fill="#E8833A"/>
+  <text x="220" y="415" text-anchor="middle" font-size="13" font-weight="600" fill="#fff">Training Set (features + label)</text>
+
+  <!-- Training pipeline -->
+  <rect x="60" y="480" width="320" height="60" rx="8" fill="#1C4E80"/>
+  <text x="220" y="506" text-anchor="middle" font-size="13" font-weight="600" fill="#fff">Training &amp; Cross-Validation</text>
+  <text x="220" y="523" text-anchor="middle" font-size="12" fill="#dbe6f5">(scikit-learn) + MLflow tracking</text>
+
+  <rect x="60" y="590" width="320" height="60" rx="8" fill="#1C4E80"/>
+  <text x="220" y="616" text-anchor="middle" font-size="13" font-weight="600" fill="#fff">MLflow Model Registry</text>
+  <text x="220" y="633" text-anchor="middle" font-size="12" fill="#dbe6f5">versioned model artifacts</text>
+
+  <!-- Right column: streaming -->
+  <rect x="820" y="150" width="320" height="60" rx="8" fill="#1C7293"/>
+  <text x="980" y="185" text-anchor="middle" font-size="13" font-weight="600" fill="#fff">Quixstreams Producer</text>
+
+  <rect x="820" y="260" width="320" height="60" rx="8" fill="#1C7293"/>
+  <text x="980" y="286" text-anchor="middle" font-size="13" font-weight="600" fill="#fff">Redpanda topic</text>
+  <text x="980" y="303" text-anchor="middle" font-size="12" fill="#dceefc" font-family="Consolas, monospace">"raw-events"</text>
+
+  <rect x="650" y="380" width="250" height="60" rx="8" fill="#1C7293"/>
+  <text x="775" y="406" text-anchor="middle" font-size="13" font-weight="600" fill="#fff">Feature Store</text>
+  <text x="775" y="423" text-anchor="middle" font-size="12" fill="#dceefc">stateful features</text>
+
+  <!-- Inference -->
+  <rect x="410" y="700" width="380" height="70" rx="8" fill="#2C5F2D"/>
+  <text x="600" y="729" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">Real-Time Inference Service</text>
+  <text x="600" y="748" text-anchor="middle" font-size="11" fill="#dcefe0">on-demand + stateful features · model from Registry</text>
+
+  <!-- Connectors -->
+  <!-- generator -> historical dataset -->
+  <line x1="530" y1="100" x2="240" y2="150" stroke="#4a4a4a" stroke-width="2" marker-end="url(#arrow)"/>
+  <!-- generator -> quixstreams producer -->
+  <line x1="670" y1="100" x2="960" y2="150" stroke="#4a4a4a" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- batch column verticals -->
+  <line x1="220" y1="210" x2="220" y2="260" stroke="#4a4a4a" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="220" y1="320" x2="220" y2="380" stroke="#4a4a4a" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="220" y1="440" x2="220" y2="480" stroke="#4a4a4a" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="220" y1="540" x2="220" y2="590" stroke="#4a4a4a" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- streaming column vertical -->
+  <line x1="980" y1="210" x2="980" y2="260" stroke="#4a4a4a" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- raw-events -> feature store -->
+  <line x1="920" y1="320" x2="830" y2="380" stroke="#4a4a4a" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="905" y="352" font-size="10" fill="#666" font-style="italic">populates</text>
+
+  <!-- raw-events -> inference (elbow via right edge) -->
+  <polyline points="1060,320 1060,735 790,735" fill="none" stroke="#4a4a4a" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="1064" y="530" font-size="10" fill="#666" font-style="italic">triggering event</text>
+
+  <!-- feature store -> inference -->
+  <line x1="760" y1="440" x2="660" y2="700" stroke="#4a4a4a" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="740" y="580" font-size="10" fill="#666" font-style="italic">stateful features</text>
+
+  <!-- model registry -> inference (elbow) -->
+  <polyline points="220,650 220,735 410,735" fill="none" stroke="#4a4a4a" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="240" y="700" font-size="10" fill="#666" font-style="italic">trained model</text>
+</svg>
