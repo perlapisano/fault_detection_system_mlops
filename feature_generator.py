@@ -170,7 +170,7 @@ def create_factory_fleet(n_machines: int) -> list:
     if n_machines < 1:
         return fleet
 
-    for i in range(1, n_machines):
+    for i in range(1, n_machines+1):
         if (i-1) % 3 == 0: # 1, 4, 7, 10...
             machine_type = "A"
 
