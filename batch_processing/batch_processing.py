@@ -34,11 +34,16 @@ def create_spark_session() -> SparkSession:
         .getOrCreate()
     )
 
+
+
 FEATURE_SCHEMA = StructType([
     StructField("machine_id",     IntegerType(), False),
     StructField("timestamp_ms", LongType(), False),
     StructField("temperature_C",         DoubleType(),  False),
-    StructField("machine_type",       StringType(),  True),
+    StructField("vibration_mm_per_s", DoubleType(),  False),
+    StructField("pressure_kPa", DoubleType(),  False),
+    StructField("rotor_speed_rpm", DoubleType(),  False),
+    StructField("machine_type", StringType(), True),
     StructField("faulty",       IntegerType(), False)
 ])
 
@@ -49,7 +54,7 @@ def load_features(spark):
 
     if not input_path.exists():
         logger.info("File non trovato — genero dati sintetici")
-        df = _generate_synthetic_data(spark, n_machines=12, n_seconds=6*3600)
+        df = _generate_synthetic_data(spark, n_machines=12, n_seconds=3600)
         df.write.mode("overwrite").parquet(str(input_path))
         logger.info(f"Dati sintetici salvati in {input_path}")
         return df
@@ -80,6 +85,9 @@ def _generate_synthetic_data(spark: SparkSession, n_machines: int, n_seconds: in
                 data["machine_id"],
                 start + (s * 1000), # timestamp in millisecondi, intero
                 data["temperature_C"],
+                data["vibration_mm_per_s"],
+                data["pressure_kPa"],
+                data["rotor_speed_rpm"],
                 data["machine_type"],
                 int(data["faulty"])
             ))
@@ -102,7 +110,7 @@ def compute_features(df):
     # Window temporali per macchina, escludendo la rilevazione corrente
     # (rangeBetween fino a -1 ms)
 
-    SIX_HOURS_MS = 6 * 60 * 60 * 1000
+    ONE_HOUR_MS = 1 * 60 * 60 * 1000
     # ONE_DAY_MS = 24 * 60 * 60 * 1000
     FIVE_MIN_MS = 5 * 60 * 1000
     ONE_MIN_MS = 60 * 1000
@@ -114,7 +122,7 @@ def compute_features(df):
             .rangeBetween(-durata_ms, -1)
         )
 
-    window_6h = finestra_macchina(SIX_HOURS_MS)
+    window_1h = finestra_macchina(ONE_HOUR_MS)
     window_5min = finestra_macchina(FIVE_MIN_MS)
     window_1min = finestra_macchina(ONE_MIN_MS)
 
@@ -125,11 +133,20 @@ def compute_features(df):
 
         # Campi della riga corrente
         "temperature_C",
+        "vibration_mm_per_s",
+        "pressure_kPa",
+        "rotor_speed_rpm",
         "machine_type",
 
         # Aggregati storici della macchina (equivalente batch)
-        f.coalesce(f.avg("temperature_C").over(window_6h), f.lit(0.0))
-            .alias("avg_temperature_C_6h"),
+        f.coalesce(f.avg("temperature_C").over(window_1h), f.lit(0.0))
+            .alias("avg_temperature_C_1h"),
+        f.coalesce(f.avg("vibration_mm_per_s").over(window_1h), f.lit(0.0))
+            .alias("avg_vibration_mm_per_s_1h"),
+        f.coalesce(f.avg("pressure_kPa").over(window_1h), f.lit(0.0))
+            .alias("avg_pressure_kPa_1h"),
+        f.coalesce(f.avg("rotor_speed_rpm").over(window_1h), f.lit(0.0))
+            .alias("avg_rotor_speed_rpm_1h"),
 
         # Aggregati "veloci" della macchina, equivalente streaming.
         f.coalesce(f.avg("temperature_C").over(window_5min), f.lit(0.0))
@@ -137,9 +154,33 @@ def compute_features(df):
         f.coalesce(f.max("temperature_C").over(window_1min), f.lit(0.0))
             .alias("max_temperature_C_1min"),
 
+        f.coalesce(f.avg("vibration_mm_per_s").over(window_5min), f.lit(0.0))
+        .alias("avg_vibration_mm_per_s_5min"),
+        f.coalesce(f.max("vibration_mm_per_s").over(window_1min), f.lit(0.0))
+        .alias("max_vibration_mm_per_s_1min"),
+
+        f.coalesce(f.avg("pressure_kPa").over(window_5min), f.lit(0.0))
+        .alias("avg_pressure_kPa_5min"),
+        f.coalesce(f.max("pressure_kPa").over(window_1min), f.lit(0.0))
+        .alias("max_pressure_kPa_1min"),
+
+        f.coalesce(f.avg("rotor_speed_rpm").over(window_5min), f.lit(0.0))
+        .alias("avg_rotor_speed_rpm_5min"),
+        f.coalesce(f.max("rotor_speed_rpm").over(window_1min), f.lit(0.0))
+        .alias("max_rotor_speed_rpm_1min"),
+
         # Label della rilevazione corrente
         "faulty",
     )
+
+    # Rimuoviamo rilevazioni senza storico per max.
+    for feature in [
+        "max_temperature_C_1min",
+        "max_vibration_mm_per_s_1min",
+        "max_pressure_kPa_1min",
+        "max_rotor_speed_rpm_1min",
+    ]:
+        df_features = df_features[df_features[feature] != 0 ]
 
     logger.info(f"Tabella di training: {df_features.count()} rilevazioni")
     return df_features
@@ -179,10 +220,14 @@ def run_batch_pipeline():
     # 4. Mostra anteprima
     logger.info("Anteprima tabella di training:")
     features_df.select(
-        "machine_id", "temperature_C", "machine_type",
-        "avg_temperature_C_6h",
+        "machine_id", "temperature_C",
+        "avg_temperature_C_1h",
         "avg_temperature_C_5min",
         "max_temperature_C_1min",
+        "vibration_mm_per_s",
+        "pressure_kPa",
+        "rotor_speed_rpm",
+        "machine_type",
         "faulty"
     ).show(10, truncate=False)
 
