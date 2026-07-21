@@ -169,7 +169,7 @@ services:
     container_name: streaming-pipeline
     environment:
       KAFKA_BROKER: redpanda:29092
-      INPUT_TOPIC: raw-transactions
+      INPUT_TOPIC: feature-simulator
       REDIS_HOST: redis
       REDIS_PORT: "6379"
     depends_on:
@@ -177,6 +177,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      ingestion:
+        condition: service_started
       # topic-init:
       #   condition: service_completed_successfully
     restart: on-failure
@@ -193,8 +195,8 @@ services:
     command: sh -c "uv run inference.py"
     environment:
       KAFKA_BROKER: redpanda:29092
-      INPUT_TOPIC: raw-transactions
-      OUTPUT_TOPIC: fraud-predictions
+      INPUT_TOPIC: feature-simulator
+      OUTPUT_TOPIC: fault-predictions
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       MLFLOW_TRACKING_URI: http://mlflow:5000
